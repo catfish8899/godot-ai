@@ -366,3 +366,42 @@ func test_scan_filesystem_sync_shape_and_coalesces_when_latch_set() -> void:
 		"shape: delta present in both paths"
 	)
 	assert_false(result.data.undoable)
+
+
+const Mutation := preload("res://addons/godot_ai/handlers/filesystem_mutation.gd")
+
+
+func test_mutation_refuses_unregistered_batch_request() -> void:
+	var result := _handler.move_file({"path": "res://unused.txt", "new_path": "res://other.txt"})
+	assert_is_error(result, ErrorCodes.INVALID_PARAMS)
+	assert_contains(result.error.message, "outside batch_execute")
+
+
+func test_mutation_uid_and_path_owner_classification() -> void:
+	var path := "res://" + "_fixture_owner_target.gd"
+	var uid := ResourceUID.create_id()
+	ResourceUID.add_id(uid, path)
+	var targets := {path: {"uid": uid}}
+	var job := Mutation.new()
+	job._deadline = Time.get_ticks_msec() + 25000
+	job._yield_at = Time.get_ticks_usec()
+	var uid_source := "const Target = preload(\"%s\")" % ResourceUID.id_to_text(uid)
+	assert_eq(await job._references("res://owner.gd", uid_source.to_utf8_buffer(), targets), [{"path": path, "kind": "uid"}])
+	var path_source := "const Target = preload(\"%s\")" % path
+	assert_eq(await job._references("res://owner.gd", path_source.to_utf8_buffer(), targets), [{"path": path, "kind": "path"}])
+	ResourceUID.remove_id(uid)
+
+
+func test_mutation_scene_fallback_requires_matching_uid_header() -> void:
+	var path := "res://" + "_fixture_header_target.gd"
+	var uid := ResourceUID.create_id()
+	ResourceUID.add_id(uid, path)
+	var targets := {path: {"uid": uid}}
+	var header := "[ext_resource type=\"Script\" uid=\"%s\" path=\"%s\" id=\"1\"]" % [ResourceUID.id_to_text(uid), path]
+	var job := Mutation.new()
+	job._deadline = Time.get_ticks_msec() + 25000
+	job._yield_at = Time.get_ticks_usec()
+	assert_eq(await job._references("res://owner.tscn", header.to_utf8_buffer(), targets), [{"path": path, "kind": "uid"}])
+	var with_property := header + "\n[node name=\"Root\" type=\"Node\"]\npath = \"%s\"" % path
+	assert_eq(await job._references("res://owner.tscn", with_property.to_utf8_buffer(), targets), [{"path": path, "kind": "path"}])
+	ResourceUID.remove_id(uid)

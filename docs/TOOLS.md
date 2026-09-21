@@ -245,7 +245,7 @@ Calls take the form:
 | `input_map_manage` | `list`, `add_action`, `ensure_action`, `remove_action`, `bind_event`, `ensure_binding` |
 | `game_manage` | `get_scene_tree`, `get_node_info`, `get_ui_elements`, `suspend`, `resume`, `next_frame`, `debug_status`, `input_key`, `input_mouse`, `input_gamepad`, `input_action`, `input_sequence`, `input_state` |
 | `autoload_manage` | `list`, `add`, `remove` |
-| `filesystem_manage` | `read_text`, `write_text`, `reimport`, `scan`, `search` |
+| `filesystem_manage` | `read_text`, `write_text`, `reimport`, `scan`, `search`, `move`, `rename`, `remove` |
 | `theme_manage` | `create`, `set_color`, `set_constant`, `set_font_size`, `set_stylebox_flat`, `set_stylebox_texture`, `set_font`, `set_icon`, `stylebox_override`, `apply` |
 | `ui_manage` | `set_anchor_preset`, `set_text`, `set_richtext`, `build_layout`, `draw_recipe` |
 | `resource_manage` | `search`, `load`, `assign`, `get_info`, `create`, `curve_set_points`, `environment_create`, `physics_shape_autofit`, `physics_shape_generate`, `gradient_texture_create`, `noise_texture_create` |
@@ -276,6 +276,31 @@ models, and audio. Godot scripts (`.gd`) are not imported resources: a successfu
 `.gd` entry only refreshes its editor filesystem cache entry and does not prove the
 script was parsed or diagnostics were produced. Use `script_patch` or
 `script_create` to save scripts and receive fresh diagnostics.
+
+`filesystem_manage(op="move"|"rename"|"remove")` performs bounded,
+fail-closed resource-group mutations. Moves carry `.uid`/`.import` sidecars and
+preserve verified UID references; they refuse literal-path dependencies,
+project-setting references, affected open scene tabs and missing destination
+parents. Automatic dependency rewriting is not supported. Discovery includes
+literal relative, `res://` and `uid://` references in .gd, .cs, .gdshader, .gdshaderinc, .tscn and .tres owners. Binary
+ownership, unreadable/oversized inputs and linked paths are refused, including
+when `force=true`; computed runtime paths are outside static owner discovery.
+Engine metadata, VCS internals and the loaded plugin implementation are excluded.
+
+Remove defaults to OS trash. `force=true` permits known dangling references,
+not unknown ownership. `permanent=true` supports files only; permanent directory
+removal is refused. None of these operations participates in editor undo.
+Call directly rather than through `batch_execute`. Directory mutations return
+`scan_required=true`; follow with `filesystem_manage(op="scan")` to refresh the
+editor tree. Discovery yields between bounded work units and refuses operations
+exceeding 10,000 project entries, 256 affected resources, 256 KiB per inspected file
+or 64 MiB of inspected bytes, including revalidation.
+
+Required fixups never fail silently: errors include `data.outcome` (`unchanged`,
+`rolled_back` or `partial`) and actual affected/unrestored paths. A partial result
+has `retry_safe=false`; inspect it before taking further action. File and sidecar
+moves attempt rollback on failure, but multi-file disk operations and separate
+OS trash calls are not claimed to be atomic against crashes or external writers.
 
 `api_manage(op="get_class")` inspects Godot API/ClassDB metadata for a class
 without creating an instance. By default it returns **only `properties`**
