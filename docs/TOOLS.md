@@ -437,3 +437,24 @@ construction budget can stop traversal sooner. The complete encoded operation
 result is capped at 64 KiB, including graph and truncation metadata. This is not
 a cap on the surrounding MCP wire frame. A result that cannot fit is refused
 with an explicit size error; reducing depth can make the request fit.
+
+### Refresh generated physics shapes
+
+`resource_manage(op="physics_shape_generate", params={"paths":["/Main/Mesh"],"overwrite":true})`
+refreshes the shape and collision transform of a collider generated with provenance
+markers by this version. It preserves the body and collision node identities, body
+settings, scripts and other children. Body type and wrapping options must match the
+existing layout. The default remains refusal when a collider already exists.
+
+Unmarked legacy colliders, stale links, and topology changes are refused. The
+markers are typed relative NodePaths saved with the scene; renaming or moving a
+node can invalidate a link. A refreshed collider receives a new Shape3D, leaving
+shared old resources untouched; undo restores the exact old resource and transform.
+Convex/trimesh vertices are fitted in the existing body coordinate system, including
+rotation, translation and mirrored winding. Existing hull budgets and scale guards
+still apply. Mixed creation and refresh requests prepare resources across frames,
+revalidate against intervening edits, then commit one undo action. Each returned
+`created` item includes `operation` (`create` or `refresh`).
+
+The 4 ms budget applies to cooperative preparation. Final validation and the
+atomic undo action cannot yield; a maximum-size batch can exceed that budget.

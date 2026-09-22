@@ -60,7 +60,7 @@ Ops:
         "capsule" for 2D) or the matching Godot class name ("BoxShape3D",
         "RectangleShape2D", etc.).
   • physics_shape_generate(paths, shape_type="box", body_type="static",
-                           reparent_mesh=False, scene_file="")
+                           reparent_mesh=False, scene_file="", overwrite=False)
         Generate a physics body sibling (named <Mesh>Collider) with a
         CollisionShape3D for every MeshInstance3D path. Shapes are fitted in
         body-local space; a mesh that already has a collider sibling, a
@@ -81,11 +81,16 @@ Ops:
         fall away from the stationary visual); reparent_mesh=True does the same
         for static/area while preserving the mesh's world transform, and the
         reported mesh_path is then the post-move path.
+        overwrite=True refreshes only a marked generated collider's shape and
+        collision transform, preserving body/collision identity and user settings.
+        Requested body type and wrapping must match; unmarked legacy bodies or
+        broken provenance links are refused. Mixed fresh/refresh batches prepare
+        all resources before one undo action; stale edits refuse the batch.
         scene_file pins the request to that edited scene. Up to 1024 paths are
         processed in bounded work across editor frames; inside batch_execute
         at most 16. The bulk write is one undo action.
         Returns: {created: [{mesh_path, body_path, shape_path, shape_type,
-                  body_type}], undoable: true}.
+                  body_type, operation: "create"|"refresh"}], undoable: true}.
   • gradient_texture_create(stops, width=256, height=1, fill="linear",
                               path="", property="", resource_path="",
                               overwrite=False)
